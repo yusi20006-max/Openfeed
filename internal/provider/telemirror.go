@@ -40,3 +40,14 @@ func (t *TeleMirror) FetchDownload(rawURL string) ([]byte, string, error) {
 	return t.client.FetchDownload(context.Background(), rawURL)
 
 }
+
+// FetchImage proxies a translate.goog-rewritten image URL (avatar or
+// post thumbnail) through the same domain-fronting path, capped at the
+// smaller image size limit. This lets the browser load images from our
+// own server instead of reaching *.translate.goog directly, which is
+// blocked on the client's network without a VPN.
+func (t *TeleMirror) FetchImage(rawURL string) ([]byte, string, error) {
+
+	return t.client.FetchURL(context.Background(), rawURL)
+
+}

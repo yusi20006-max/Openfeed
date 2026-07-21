@@ -399,6 +399,29 @@ header h2 {
   font-size: 13px;
 }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(20px);
+  max-width: 90vw;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 1000;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .media-broken .retry {
   color: var(--accent);
   cursor: pointer;

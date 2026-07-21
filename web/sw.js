@@ -1,4 +1,4 @@
-const CACHE_NAME = "openfeed-shell-v2";
+const CACHE_NAME = "openfeed-shell-v3";
 const SHELL_FILES = [
   "/",
   "/index.html",

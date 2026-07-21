@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	neturl "net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -493,6 +494,25 @@ func (c *Client) do(ctx context.Context, ap proxyAttempt, host, username, ua str
 	return string(body), resp.StatusCode, nil
 }
 
+// toTranslateGoogHost converts an arbitrary hostname into its
+// Google-Translate proxy equivalent (dots become dashes, then
+// ".translate.goog" is appended) — the same trick used for the t.me
+// widget itself (t.me -> t-me.translate.goog), generalized to any
+// host. This matters because plain domain fronting (dialing a Google
+// IP with a Google SNI but a foreign Host header) only works for
+// hosts Google's edge actually serves, like translate.goog — it does
+// NOT work for arbitrary blocked hosts such as Telegram's own
+// cdn*.telesco.pe, which is why images kept failing even though the
+// widget HTML (fetched via a real translate.goog host) succeeded.
+// Rewriting the CDN host itself into a translate.goog form makes
+// Google genuinely proxy it, the same way it proxies t.me.
+func toTranslateGoogHost(host string) string {
+	if strings.HasSuffix(host, ".translate.goog") {
+		return host
+	}
+	return strings.ReplaceAll(host, ".", "-") + ".translate.goog"
+}
+
 // FetchURL fetches an arbitrary URL through the same fronting/uTLS
 // attempts used for the channel widget, but with the request Host set
 // to the URL's actual host (not proxyHost) so Google's edge routes it
@@ -513,7 +533,20 @@ func (c *Client) FetchURLLimit(ctx context.Context, rawURL string, limit int64) 
 	if err != nil || u.Scheme != "https" || u.Host == "" {
 		return nil, "", fmt.Errorf("telemirror: bad url %q", rawURL)
 	}
-	hostHeader := u.Host
+
+	frontHost := toTranslateGoogHost(u.Host)
+
+	buildFrontURL := func(sl, tl string) string {
+		fu := *u
+		fu.Host = frontHost
+		q := fu.Query()
+		q.Set("_x_tr_sl", sl)
+		q.Set("_x_tr_tl", tl)
+		q.Set("_x_tr_hl", "en")
+		q.Set("_x_tr_pto", "wapp")
+		fu.RawQuery = q.Encode()
+		return fu.String()
+	}
 
 	var lastErr error
 	for i, ap := range c.orderedAttempts() {
@@ -524,7 +557,8 @@ func (c *Client) FetchURLLimit(ctx context.Context, rawURL string, limit int64) 
 			case <-time.After(200 * time.Millisecond):
 			}
 		}
-		body, ctype, status, err := c.fetchOnce(ctx, ap, rawURL, hostHeader, limit)
+		frontURL := buildFrontURL(ap.sl, ap.tl)
+		body, ctype, status, err := c.fetchOnce(ctx, ap, frontURL, frontHost, limit)
 		if err != nil {
 			lastErr = fmt.Errorf("attempt %d (%s): %w", i+1, ap.label(), err)
 			continue
@@ -535,6 +569,22 @@ func (c *Client) FetchURLLimit(ctx context.Context, rawURL string, limit int64) 
 		}
 		lastErr = fmt.Errorf("attempt %d (%s) status %d", i+1, ap.label(), status)
 	}
+
+	// Every fronted attempt failed — try the original URL directly
+	// once, in case this particular host wasn't actually blocked (or
+	// was already a translate.goog URL to start with).
+	if frontHost != u.Host {
+		body, ctype, status, ferr := c.fetchOnce(ctx, proxyAttempt{sni: sniUseHost, fp: fingerprints[1]}, u.String(), u.Host, limit)
+		if ferr == nil && status == http.StatusOK {
+			return body, ctype, nil
+		}
+		if ferr != nil {
+			lastErr = fmt.Errorf("direct fallback: %w", ferr)
+		} else {
+			lastErr = fmt.Errorf("direct fallback status %d", status)
+		}
+	}
+
 	if lastErr == nil {
 		lastErr = fmt.Errorf("telemirror: all attempts exhausted")
 	}

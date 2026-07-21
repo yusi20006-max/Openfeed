@@ -132,16 +132,65 @@ function showError(message, retryFn){
 
 // ---------- media helpers ----------
 
+// Small transient message at the bottom of the screen. Used instead of
+// navigating away when a download fails, since a full-page navigation
+// to an error response replaces the whole app shell in standalone PWA
+// mode (no address bar, no back button) — it looks like a crash.
+let toastTimer = null;
+function showToast(text){
+  let el = document.getElementById("toast");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "toast";
+    el.className = "toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
+}
+
+// Fetches the download URL first instead of navigating the page
+// straight to it. On success the bytes are handed to the browser as a
+// blob download (page never leaves the app); on failure (e.g. the
+// source is blocked without a VPN) we show a toast instead of letting
+// the error response take over the screen.
+async function triggerDownload(url, filename){
+  try{
+    const res = await fetch(url);
+    if(!res.ok){
+      const msg = await res.text().catch(() => "");
+      throw new Error(msg || ("HTTP " + res.status));
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename || "file";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+  }catch(e){
+    showToast("دانلود ناموفق بود — احتمالاً بدون فیلترشکن قابل‌دسترس نیست");
+  }
+}
+
 // Building the download URL/filename here in one place keeps the
 // extension guess and the /api/download plumbing in sync.
-function downloadUrlFor(media, postId){
-  if(!media.download) return "";
+function downloadNameFor(media, postId){
   const ext = media.type === "video" ? "mp4"
     : media.type === "voice" ? "ogg"
     : media.type === "audio" ? "mp3"
     : "bin";
   const base = media.title || (postId ? postId.replace("/", "_") : "file");
-  const name = base.includes(".") ? base : base + "." + ext;
+  return base.includes(".") ? base : base + "." + ext;
+}
+
+function downloadUrlFor(media, postId){
+  if(!media.download) return "";
+  const name = downloadNameFor(media, postId);
   return "/api/download?u=" + encodeURIComponent(media.download) + "&name=" + encodeURIComponent(name);
 }
 
@@ -224,7 +273,7 @@ function renderMedia(media, postId){
     if(media.download){
       wrap.style.cursor = "pointer";
       wrap.title = "دانلود ویدیو";
-      wrap.onclick = () => { window.location.href = downloadUrlFor(media, postId); };
+      wrap.onclick = () => triggerDownload(downloadUrlFor(media, postId), downloadNameFor(media, postId));
     }
     return wrap;
   }
@@ -282,8 +331,12 @@ function renderMedia(media, postId){
       const btn = document.createElement("a");
       btn.className = "media-download-btn";
       btn.textContent = "⬇";
-      btn.href = downloadUrlFor(media, postId);
+      btn.href = "#";
       btn.title = "دانلود";
+      btn.onclick = (e) => {
+        e.preventDefault();
+        triggerDownload(downloadUrlFor(media, postId), downloadNameFor(media, postId));
+      };
       wrap.appendChild(btn);
     }
 

@@ -17,6 +17,8 @@ func main() {
 
 	http.HandleFunc("/api/download", api.Download)
 
+	http.HandleFunc("/api/image", api.Image)
+
 	log.Println("OpenFeed started on :8080")
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
