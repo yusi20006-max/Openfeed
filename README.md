@@ -70,3 +70,28 @@ web/                    PWA (HTML/CSS/JS ساده، بدون فریم‌ورک)
 این پروژه شخصی است؛ فایل مجوز به‌دلخواه بعداً اضافه می‌شود.
 
 
+
+---
+
+# Stable Core Policy
+
+OpenFeed is considered the Stable Core of the Yasin ecosystem.
+
+Its responsibilities are:
+
+- Fetch content from supported sources
+- Provide a stable local API
+- Download and cache media
+- Maintain high reliability
+
+New features such as AI processing, scheduling, publishing,
+queue management, dashboards, and plugins must be implemented
+in downstream projects such as FeedBridge.
+
+OpenFeed will receive only:
+
+- Bug fixes
+- Security updates
+- Performance improvements
+- Compatibility updates
+
