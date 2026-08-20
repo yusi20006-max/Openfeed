@@ -27,11 +27,11 @@ Web App) قرار می‌گیرد که مستقیماً در مرورگر گوش
 
 نیازمند [Go](https://go.dev) نسخه‌ی ۱.۲۵ به بالا.
 
-```bash
-git clone https://github.com/yusi20006-max/openfeed.git
-cd openfeed
+### نصب معمولی
 
-# آماده‌سازی dependencyها و build
+```bash
+git clone https://github.com/yusi20006-max/Openfeed.git
+cd Openfeed
 go mod download
 go build -o openfeed ./cmd/server
 ./openfeed
@@ -45,15 +45,42 @@ http://127.0.0.1:8080
 
 ### نصب روی Termux
 
-برای Termux مسیر پیشنهادی این است:
+مسیر نصب Termux به‌صورت واقعی روی Termux/Android تست و تأیید شده است.
+ابتدا مطمئن شوید Go نسخه‌ی ۱.۲۵ یا بالاتر نصب است.
+
+#### دستور کامل نصب از صفر
+
+```bash
+cd ~/projects && rm -rf Openfeed && pkg update && pkg install -y git golang && git clone https://github.com/yusi20006-max/Openfeed.git && cd Openfeed && bash scripts/termux-bootstrap.sh && ./openfeed
+```
+
+این دستور کل مسیر را انجام می‌دهد:
+
+```text
+update packages
+    ↓
+install Git + Go
+    ↓
+clone OpenFeed
+    ↓
+Termux bootstrap
+    ↓
+download Go dependencies
+    ↓
+build OpenFeed
+    ↓
+run OpenFeed
+```
+
+> اگر نمی‌خواهید نسخه‌ی قبلی پروژه حذف شود، بخش `rm -rf Openfeed` را اجرا نکنید و فقط وارد repository موجود شوید.
+
+مسیر مرحله‌ای معادل:
 
 ```bash
 pkg update
-pkg install git golang
-
-git clone https://github.com/yusi20006-max/openfeed.git
-cd openfeed
-
+pkg install -y git golang
+git clone https://github.com/yusi20006-max/Openfeed.git
+cd Openfeed
 bash scripts/termux-bootstrap.sh
 ./openfeed
 ```
