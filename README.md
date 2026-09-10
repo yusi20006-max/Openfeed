@@ -37,10 +37,17 @@ go build -o openfeed ./cmd/server
 ./openfeed
 ```
 
-سپس مرورگر را باز کنید روی:
+OpenFeed طبق قرارداد فعلی Yasin روی پورت HTTP `7006` اجرا می‌شود.
+مرورگر را باز کنید روی:
 
 ```text
-http://127.0.0.1:8080
+http://127.0.0.1:7006/
+```
+
+در صورت نیاز برای اجرای محلی روی پورت دیگری می‌توانید متغیر محیطی `OPENFEED_PORT` را تنظیم کنید:
+
+```bash
+OPENFEED_PORT=7006 ./openfeed
 ```
 
 ### نصب روی Termux
@@ -69,7 +76,7 @@ download Go dependencies
     ↓
 build OpenFeed
     ↓
-run OpenFeed
+run OpenFeed on port 7006
 ```
 
 > اگر نمی‌خواهید نسخه‌ی قبلی پروژه حذف شود، بخش `rm -rf Openfeed` را اجرا نکنید و فقط وارد repository موجود شوید.
