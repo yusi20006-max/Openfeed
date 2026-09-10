@@ -46,16 +46,14 @@ func TestResolveValidatedIPsForbiddenIPRejected(t *testing.T) {
 		"127.0.0.1", "::1",
 		"10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.1.1",
 		"169.254.10.20", "fe80::1",
-		"fc00::1", "fd00::1", // ULA
+		"fc00::1", "fd00::1",
 		"::", "0.0.0.0",
-		"224.0.0.1", "ff02::1", // multicast
-		"100.64.0.1",                               // CGNAT
-		"192.0.2.1", "198.51.100.1", "203.0.113.1", // TEST-NET
-		"198.18.0.1", // benchmarking
-		"240.0.0.1",  // reserved
-		"255.255.255.255",
-		"::ffff:127.0.0.1", // 4-in-6 loopback smuggling
-		"::ffff:10.0.0.1",  // 4-in-6 private smuggling
+		"224.0.0.1", "ff02::1",
+		"100.64.0.1",
+		"192.0.2.1", "198.51.100.1", "203.0.113.1",
+		"198.18.0.1",
+		"240.0.0.1", "255.255.255.255",
+		"::ffff:127.0.0.1", "::ffff:10.0.0.1",
 	}
 	for _, host := range forbidden {
 		if _, err := resolveValidatedIPs(ctx, host); err == nil {
@@ -67,15 +65,13 @@ func TestResolveValidatedIPsForbiddenIPRejected(t *testing.T) {
 func TestResolveValidatedIPsLocalhostRejected(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	// Fail closed either way: loopback answer => forbidden, or lookup
-	// failure => rejected. Both are acceptable rejections.
 	if _, err := resolveValidatedIPs(ctx, "localhost"); err == nil {
 		t.Errorf("resolveValidatedIPs(localhost) = success, want rejection")
 	}
 }
 
 func TestResolveValidatedIPsPublicHostnameAccepted(t *testing.T) {
-	restore := stubLookup(ipAddrs("93.184.216.34"), nil) // example.com
+	restore := stubLookup(ipAddrs("93.184.216.34"), nil)
 	defer restore()
 	ctx := context.Background()
 	ips, err := resolveValidatedIPs(ctx, "public.example")
@@ -110,11 +106,9 @@ func TestResolveValidatedIPsMixedAnswersFailClosed(t *testing.T) {
 
 func TestValidateSafeURL(t *testing.T) {
 	ctx := context.Background()
-	// Public IP literal accepted without DNS.
 	if _, err := validateSafeURL(ctx, "https://8.8.8.8/s/x"); err != nil {
 		t.Errorf("validateSafeURL(public IP) unexpected error: %v", err)
 	}
-	// Forbidden IP literals rejected.
 	for _, raw := range []string{
 		"https://127.0.0.1/s/x",
 		"https://192.168.1.1/",
@@ -127,11 +121,9 @@ func TestValidateSafeURL(t *testing.T) {
 			t.Errorf("validateSafeURL(%q) = success, want rejection", raw)
 		}
 	}
-	// Non-https rejected.
 	if _, err := validateSafeURL(ctx, "http://8.8.8.8/"); err == nil {
 		t.Errorf("validateSafeURL(http) = success, want rejection")
 	}
-	// Localhost rejected (real resolver, fail closed).
 	func() {
 		c, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
@@ -139,13 +131,11 @@ func TestValidateSafeURL(t *testing.T) {
 			t.Errorf("validateSafeURL(localhost) = success, want rejection")
 		}
 	}()
-	// Public hostname accepted via stubbed resolver.
 	restore := stubLookup(ipAddrs("93.184.216.34"), nil)
 	if _, err := validateSafeURL(ctx, "https://public.example/x"); err != nil {
 		t.Errorf("validateSafeURL(public hostname) unexpected error: %v", err)
 	}
 	restore()
-	// Mixed answers rejected via stubbed resolver.
 	restore = stubLookup(ipAddrs("93.184.216.34", "192.168.1.1"), nil)
 	if _, err := validateSafeURL(ctx, "https://mixed.example/x"); err == nil {
 		t.Errorf("validateSafeURL(mixed) = success, want rejection")
@@ -175,8 +165,6 @@ func TestDirectDialRejectsPrivateBeforeContact(t *testing.T) {
 			t.Errorf("direct dial(%q) took %v, expected fast validation failure before network contact", addr, elapsed)
 		}
 	}
-	// Hostname whose DNS answer is private must also be rejected before
-	// any TCP contact, even though the name itself looks innocuous.
 	restore := stubLookup(ipAddrs("10.1.2.3"), nil)
 	defer restore()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -191,7 +179,6 @@ func TestDirectDialRejectsPrivateBeforeContact(t *testing.T) {
 }
 
 func TestFixedIPFrontedPathUnchanged(t *testing.T) {
-	// Pinned front attempts must still exist.
 	found := false
 	for _, ap := range proxyAttempts {
 		if ap.ip != "" {
@@ -202,8 +189,6 @@ func TestFixedIPFrontedPathUnchanged(t *testing.T) {
 	if !found {
 		t.Fatalf("no fixed-IP fronted attempts in proxyAttempts")
 	}
-	// The fixed-IP path must not consult the hostname resolver: it dials
-	// the pinned IP. Stub the resolver to fail loudly if called.
 	called := false
 	orig := lookupIPAddr
 	lookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) {
@@ -211,9 +196,6 @@ func TestFixedIPFrontedPathUnchanged(t *testing.T) {
 		return nil, context.DeadlineExceeded
 	}
 	defer func() { lookupIPAddr = orig }()
-	// Dial a loopback fixed IP with nothing listening: expect a fast
-	// connection-refused (proof it targeted the fixed IP), NOT a
-	// validation error, and the resolver must not have been called.
 	fixed := proxyAttempt{ip: "127.0.0.1", sni: frontSNI, fp: fingerprints[1]}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -230,7 +212,6 @@ func TestFixedIPFrontedPathUnchanged(t *testing.T) {
 }
 
 func TestSafeCheckRedirectPreserved(t *testing.T) {
-	// Public redirect target accepted (stubbed).
 	restore := stubLookup(ipAddrs("93.184.216.34"), nil)
 	req := &http.Request{URL: mustParseURL(t, "https://public.example/next"), Method: "GET"}
 	req = req.WithContext(context.Background())
@@ -238,13 +219,11 @@ func TestSafeCheckRedirectPreserved(t *testing.T) {
 		t.Errorf("safeCheckRedirect(public) unexpected error: %v", err)
 	}
 	restore()
-	// Private redirect target rejected without stub (IP literal, no DNS).
 	reqPriv := &http.Request{URL: mustParseURL(t, "https://192.168.1.1/next"), Method: "GET"}
 	reqPriv = reqPriv.WithContext(context.Background())
 	if err := safeCheckRedirect(reqPriv, nil); err == nil {
 		t.Errorf("safeCheckRedirect(private) = success, want rejection")
 	}
-	// Localhost redirect rejected.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	reqLocal := &http.Request{URL: mustParseURL(t, "https://localhost/next"), Method: "GET"}
@@ -252,7 +231,6 @@ func TestSafeCheckRedirectPreserved(t *testing.T) {
 	if err := safeCheckRedirect(reqLocal, nil); err == nil {
 		t.Errorf("safeCheckRedirect(localhost) = success, want rejection")
 	}
-	// Mixed-answer redirect rejected.
 	restore = stubLookup(ipAddrs("93.184.216.34", "10.0.0.1"), nil)
 	reqMixed := &http.Request{URL: mustParseURL(t, "https://mixed.example/next"), Method: "GET"}
 	reqMixed = reqMixed.WithContext(context.Background())
@@ -260,7 +238,6 @@ func TestSafeCheckRedirectPreserved(t *testing.T) {
 		t.Errorf("safeCheckRedirect(mixed) = success, want rejection")
 	}
 	restore()
-	// Redirect cap preserved.
 	restore = stubLookup(ipAddrs("93.184.216.34"), nil)
 	defer restore()
 	reqCap := &http.Request{URL: mustParseURL(t, "https://public.example/next"), Method: "GET"}
@@ -291,5 +268,51 @@ func TestFetchURLLimitRejectsPrivateBeforeContact(t *testing.T) {
 	}
 	if time.Since(start) > 8*time.Second {
 		t.Errorf("FetchURLLimit(private) took too long; must reject before network contact")
+	}
+}
+
+func TestTelegramCDNValidationExceptionForFakeIPDNS(t *testing.T) {
+	ctx := context.Background()
+	restore := stubLookup(ipAddrs("198.18.0.7"), nil)
+	defer restore()
+
+	for _, host := range []string{
+		"cdn4.telesco.pe",
+		"cdn1.telesco.pe",
+		"CDN9.TELESCO.PE.",
+	} {
+		if !isTelegramCDNHost(host) {
+			t.Errorf("isTelegramCDNHost(%q) = false, want true", host)
+		}
+		if _, err := validateSafeURL(ctx, "https://"+host+"/file/test.jpg"); err != nil {
+			t.Errorf("validateSafeURL(%q) unexpected error with fake DNS answer: %v", host, err)
+		}
+	}
+
+	for _, host := range []string{
+		"cdn.telesco.pe",
+		"cdn4.example.com",
+		"cdn4.telesco.pe.evil.example",
+		"foo.telesco.pe",
+		"cdn-4.telesco.pe",
+	} {
+		if isTelegramCDNHost(host) {
+			t.Errorf("isTelegramCDNHost(%q) = true, want false", host)
+		}
+		if _, err := validateSafeURL(ctx, "https://"+host+"/file/test.jpg"); err == nil {
+			t.Errorf("validateSafeURL(%q) = success, want DNS validation/rejection", host)
+		}
+	}
+}
+
+func TestTelegramCDNDoesNotPermitUnsafeIPLiteral(t *testing.T) {
+	for _, raw := range []string{
+		"https://198.18.0.7/file/test.jpg",
+		"https://127.0.0.1/file/test.jpg",
+		"https://192.168.1.1/file/test.jpg",
+	} {
+		if _, err := validateSafeURL(context.Background(), raw); err == nil {
+			t.Errorf("validateSafeURL(%q) = success, want rejection", raw)
+		}
 	}
 }

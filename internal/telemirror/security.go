@@ -24,6 +24,9 @@ package telemirror
 //     only the validated IP literals, never passing a hostname to
 //     net.Dialer (TOCTOU pinning).
 //   - safeCheckRedirect re-validates every redirect target (fail closed).
+//   - Telegram CDN hostnames are a narrow exception for the fronted
+//     media path: their local DNS may be synthetic 198.18/15, but the
+//     original CDN hostname is never directly dialed by that path.
 // Fixed-IP fronted attempts (ap.ip != "") are preserved unchanged:
 // they keep dialing the pinned front IP.
 
@@ -53,7 +56,7 @@ func init() {
 		"192.0.0.0/24",    // IETF protocol assignments
 		"192.0.2.0/24",    // TEST-NET-1
 		"192.168.0.0/16",  // RFC1918 (also covered by IsPrivate)
-		"198.18.0.0/15",   // benchmarking
+		"198.18.0.0/15",   // benchmarking / synthetic DNS ranges
 		"198.51.100.0/24", // TEST-NET-2
 		"203.0.113.0/24",  // TEST-NET-3
 		"224.0.0.0/4",     // multicast (also covered by IsMulticast)
@@ -97,9 +100,6 @@ func isForbiddenIP(ip net.IP) bool {
 			return true
 		}
 	}
-	// Evaluate an embedded IPv4 too (e.g. ::ffff:127.0.0.1), so a
-	// 4-in-6 encoding cannot smuggle a forbidden v4 destination past
-	// the checks above.
 	if v4 := ip.To4(); v4 != nil && !ip.IsUnspecified() {
 		for _, n := range forbiddenNets {
 			if n.Contains(v4) {
@@ -120,13 +120,6 @@ var lookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) 
 	return net.DefaultResolver.LookupIPAddr(ctx, host)
 }
 
-// resolveValidatedIPs resolves host once and returns only validated,
-// dialable IPs. Fail closed:
-//   - IP literals: rejected when forbidden, otherwise returned as-is.
-//   - Hostnames: resolved via LookupIPAddr; rejected when the lookup
-//     fails, returns no answers, or ANY answer is forbidden (single
-//     poisoned answer poisons the whole set — required against DNS
-//     rebinding where the attacker controls one record).
 func resolveValidatedIPs(ctx context.Context, host string) ([]net.IP, error) {
 	host = strings.TrimSpace(host)
 	host = strings.TrimSuffix(host, ".")
@@ -160,11 +153,36 @@ func resolveValidatedIPs(ctx context.Context, host string) ([]net.IP, error) {
 	return out, nil
 }
 
+// isTelegramCDNHost recognizes only the numeric cdnN.telesco.pe names
+// used by Telegram media. It is intentionally narrower than accepting
+// every telesco.pe subdomain, so the DNS-validation exception cannot
+// become a generic bypass for arbitrary hosts.
+func isTelegramCDNHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	const suffix = ".telesco.pe"
+	if !strings.HasSuffix(host, suffix) {
+		return false
+	}
+	label := strings.TrimSuffix(host, suffix)
+	if !strings.HasPrefix(label, "cdn") || len(label) == len("cdn") {
+		return false
+	}
+	for _, r := range label[len("cdn"):] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // validateSafeURL parses rawURL, requires https with a non-empty host,
-// and validates the hostname via resolveValidatedIPs. It is the
-// check-time gate; the dial-time gate inside dialTLSFor re-validates
-// and pins the connection to validated IPs so check and use cannot
-// diverge (DNS rebinding TOCTOU).
+// and validates the hostname via resolveValidatedIPs. Telegram CDN
+// hostnames are the sole DNS-validation exception: their local resolver
+// can return a synthetic 198.18/15 address in fake-IP proxy environments.
+// Those URLs are consumed by FetchImage/FetchURL through a fixed-IP
+// translate.goog fronting attempt; the original CDN hostname is not
+// passed to net.Dialer. If the fronted path falls back to direct dialing,
+// dialTLSFor still resolves and validates the hostname at use time.
 func validateSafeURL(ctx context.Context, rawURL string) (*neturl.URL, error) {
 	u, err := neturl.Parse(rawURL)
 	if err != nil {
@@ -180,16 +198,15 @@ func validateSafeURL(ctx context.Context, rawURL string) (*neturl.URL, error) {
 	if hostname == "" {
 		return nil, fmt.Errorf("telemirror: empty hostname")
 	}
+	if isTelegramCDNHost(hostname) {
+		return u, nil
+	}
 	if _, err := resolveValidatedIPs(ctx, hostname); err != nil {
 		return nil, err
 	}
 	return u, nil
 }
 
-// safeCheckRedirect is installed as http.Client.CheckRedirect so every
-// redirect target is re-validated. Any forbidden/private/rebound target
-// aborts the redirect chain (fail closed). The 10-redirect cap preserves
-// net/http's default behavior.
 func safeCheckRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
 		return fmt.Errorf("telemirror: stopped after 10 redirects")
