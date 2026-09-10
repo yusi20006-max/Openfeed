@@ -83,9 +83,9 @@ func portInUse(port string) bool {
 }
 
 type processInfo struct {
-	pid  int
-	cmd  string
-	cwd  string
+	pid int
+	cmd string
+	cwd string
 }
 
 func findOwnedOpenFeedProcesses(root string) ([]int, error) {
@@ -138,9 +138,11 @@ func readProcessInfo(pid int) (processInfo, error) {
 
 func isOpenFeedCommand(cmd string) bool {
 	cmd = strings.ToLower(strings.TrimSpace(cmd))
-	return strings.Contains(cmd, "go run ./cmd/server") ||
-		strings.Contains(cmd, "go-build") && strings.HasSuffix(cmd, "/server") ||
-		strings.Contains(cmd, "openfeed") && strings.Contains(cmd, "server")
+	return cmd == "./openfeed" ||
+		strings.HasSuffix(cmd, "/openfeed") ||
+		strings.Contains(cmd, "go run ./cmd/server") ||
+		(strings.Contains(cmd, "go-build") && strings.HasSuffix(cmd, "/server")) ||
+		(strings.Contains(cmd, "openfeed") && strings.Contains(cmd, "server"))
 }
 
 func terminateProcess(pid int) error {
