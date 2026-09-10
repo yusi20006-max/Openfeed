@@ -142,7 +142,15 @@
     content.insertBefore(btn, content.firstChild);
   }
 
-  const observer = new MutationObserver(() => { loadMore(); addLatestMenu(); });
+  const observer = new MutationObserver(() => {
+    observer.disconnect();
+    try{
+      loadMore();
+      addLatestMenu();
+    }finally{
+      observer.observe(document.body, {childList:true, subtree:true});
+    }
+  });
   observer.observe(document.body, {childList:true, subtree:true});
   addLatestMenu();
 })();
