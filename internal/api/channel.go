@@ -53,7 +53,7 @@ func fetchChannelPage(name string, beforeID, limit int) (*model.Channel, error) 
 	)
 
 	for lenPosts := 0; lenPosts < limit; {
-		var html string
+		var html []byte
 		var err error
 		if cursor > 0 {
 			html, err = provider.Default.ClientFetchHTMLBefore(name, cursor)
