@@ -113,14 +113,18 @@ func findOwnedOpenFeedProcesses(root string) ([]int, error) {
 		if err != nil {
 			continue
 		}
-		if info.cwd != root {
-			continue
-		}
-		if isOpenFeedCommand(info.cmd) {
+		if isManagedOpenFeedProcess(root, info) {
 			pids = append(pids, info.pid)
 		}
 	}
 	return pids, nil
+}
+
+func isManagedOpenFeedProcess(root string, info processInfo) bool {
+	if isNativeOpenFeedCommand(info.cmd) {
+		return true
+	}
+	return info.cwd == root && isOpenFeedCommand(info.cmd)
 }
 
 func readProcessInfo(pid int) (processInfo, error) {
@@ -136,10 +140,21 @@ func readProcessInfo(pid int) (processInfo, error) {
 	return processInfo{pid: pid, cmd: cmd, cwd: cwd}, nil
 }
 
+func isNativeOpenFeedCommand(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return false
+	}
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return false
+	}
+	return strings.EqualFold(filepath.Base(parts[0]), "openfeed")
+}
+
 func isOpenFeedCommand(cmd string) bool {
 	cmd = strings.ToLower(strings.TrimSpace(cmd))
-	return cmd == "./openfeed" ||
-		strings.HasSuffix(cmd, "/openfeed") ||
+	return isNativeOpenFeedCommand(cmd) ||
 		strings.Contains(cmd, "go run ./cmd/server") ||
 		(strings.Contains(cmd, "go-build") && strings.HasSuffix(cmd, "/server")) ||
 		(strings.Contains(cmd, "openfeed") && strings.Contains(cmd, "server"))
