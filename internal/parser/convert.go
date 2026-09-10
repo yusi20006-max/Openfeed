@@ -2,6 +2,7 @@ package parser
 
 import (
 	"net/url"
+	"sort"
 	"time"
 
 	"openfeed/internal/model"
@@ -21,8 +22,7 @@ func proxyImage(raw string) string {
 }
 
 // Convert maps the rich telemirror result (real parser: media, replies,
-// forwards, sanitized HTML) onto openfeed's own simpler model used by
-// the frontend.
+// forwards, sanitized HTML) onto openfeed's own simpler model used by the frontend.
 func Convert(ch *telemirror.Channel, posts []telemirror.Post) *model.Channel {
 
 	dst := &model.Channel{
@@ -33,6 +33,20 @@ func Convert(ch *telemirror.Channel, posts []telemirror.Post) *model.Channel {
 		Subscribers: ch.Subscribers,
 		Posts:       make([]model.Post, 0, len(posts)),
 	}
+
+	// Keep pagination/load-more semantics intact: only establish the order of
+	// the posts already returned by the provider. Newest posts are first, while
+	// older posts remain in their relative order and can still be appended by a
+	// future page without reversing the accumulated feed.
+	sort.SliceStable(posts, func(i, j int) bool {
+		if posts[i].Time.IsZero() {
+			return false
+		}
+		if posts[j].Time.IsZero() {
+			return true
+		}
+		return posts[i].Time.After(posts[j].Time)
+	})
 
 	for _, p := range posts {
 
