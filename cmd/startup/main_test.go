@@ -11,7 +11,10 @@ func TestIsOpenFeedCommand(t *testing.T) {
 		{name: "go run server", cmd: "go run ./cmd/server", want: true},
 		{name: "go build temporary server", cmd: "/tmp/go-build123/exe/server", want: true},
 		{name: "openfeed server binary", cmd: "/home/user/openfeed server", want: true},
+		{name: "native relative openfeed binary", cmd: "./openfeed", want: true},
+		{name: "native absolute openfeed binary", cmd: "/home/user/openfeed", want: true},
 		{name: "foreign server", cmd: "/home/user/other-service server", want: false},
+		{name: "foreign openfeed-like name", cmd: "/home/user/openfeed-helper", want: false},
 		{name: "go test", cmd: "go test ./...", want: false},
 	}
 
