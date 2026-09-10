@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -33,13 +34,16 @@ func TestConvertOrdersPostsNewestFirst(t *testing.T) {
 
 func TestConvertKeepsImageProxyLocal(t *testing.T) {
 	posts := []telemirror.Post{{
-		ID: "test/1",
+		ID:   "test/1",
 		Time: time.Now(),
-		Media: []telemirror.Media{{Type: "photo", Thumb: "https://example.translate.goog/image.jpg?_x_tr_sl=auto"}},
+		Media: []telemirror.Media{{
+			Type:  "photo",
+			Thumb: "https://example.translate.goog/image.jpg?_x_tr_sl=auto",
+		}},
 	}}
 
 	channel := Convert(&telemirror.Channel{Username: "test"}, posts)
-	if got := channel.Posts[0].Media[0].URL; got == "" || got[:len("/api/image?u=")] != "/api/image?u=" {
+	if got := channel.Posts[0].Media[0].URL; !strings.HasPrefix(got, "/api/image?u=") {
 		t.Fatalf("image URL = %q, want local /api/image proxy", got)
 	}
 }
