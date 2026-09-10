@@ -3,9 +3,12 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"openfeed/internal/api"
 )
+
+const defaultPort = "7006"
 
 func main() {
 
@@ -19,8 +22,14 @@ func main() {
 
 	http.HandleFunc("/api/image", api.Image)
 
-	log.Println("OpenFeed started on :8080")
+	port := os.Getenv("OPENFEED_PORT")
+	if port == "" {
+		port = defaultPort
+	}
+	addr := ":" + port
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Printf("OpenFeed started on %s", addr)
+
+	log.Fatal(http.ListenAndServe(addr, nil))
 
 }
