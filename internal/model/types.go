@@ -7,6 +7,8 @@ type Channel struct {
 	Description string `json:"description"`
 	Subscribers string `json:"subscribers"`
 	Posts       []Post `json:"posts"`
+	NextBefore string `json:"next_before,omitempty"`
+	HasMore     bool   `json:"has_more"`
 }
 
 type Media struct {
