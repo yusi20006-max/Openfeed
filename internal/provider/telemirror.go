@@ -32,6 +32,12 @@ func (t *TeleMirror) LoadChannel(name string) ([]byte, error) {
 
 }
 
+// ClientFetchHTMLBefore fetches the channel widget strictly older than
+// the supplied Telegram message ID. It is used by the API pagination layer.
+func (t *TeleMirror) ClientFetchHTMLBefore(name string, beforeID int) (string, error) {
+	return t.client.FetchHTMLBefore(context.Background(), name, beforeID)
+}
+
 // FetchDownload proxies an arbitrary media URL (video/audio/document)
 // through the same domain-fronting path used for the channel widget,
 // sized for large files rather than the small image/thumbnail cap.
