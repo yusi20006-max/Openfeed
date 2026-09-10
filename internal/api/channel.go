@@ -46,9 +46,11 @@ func Channel(w http.ResponseWriter, r *http.Request) {
 
 func fetchChannelPage(name string, beforeID, limit int) (*model.Channel, error) {
 	var (
-		result *model.Channel
-		seen   = map[string]struct{}{}
-		cursor = beforeID
+		result   *model.Channel
+		seen     = map[string]struct{}{}
+		cursor   = beforeID
+		hasMore  = false
+		pageSize = 0
 	)
 
 	for lenPosts := 0; lenPosts < limit; {
@@ -68,6 +70,7 @@ func fetchChannelPage(name string, beforeID, limit int) (*model.Channel, error) 
 			return nil, err
 		}
 		converted := parser.Convert(ch, posts)
+		pageSize = len(converted.Posts)
 		if result == nil {
 			result = converted
 		} else {
@@ -82,11 +85,15 @@ func fetchChannelPage(name string, beforeID, limit int) (*model.Channel, error) 
 			seen[post.ID] = struct{}{}
 		}
 
-		lenPosts = len(result.Posts)
-		if len(converted.Posts) == 0 || len(converted.Posts) < 10 {
+		lenPosts := len(result.Posts)
+		if pageSize == 0 {
 			break
 		}
 		if lenPosts >= limit {
+			hasMore = true
+			break
+		}
+		if pageSize < 10 {
 			break
 		}
 
@@ -108,6 +115,7 @@ func fetchChannelPage(name string, beforeID, limit int) (*model.Channel, error) 
 	if len(result.Posts) > limit {
 		result.Posts = result.Posts[:limit]
 	}
+	result.HasMore = hasMore
 	if len(result.Posts) > 0 {
 		parts := strings.Split(result.Posts[len(result.Posts)-1].ID, "/")
 		if len(parts) > 0 {
@@ -116,5 +124,6 @@ func fetchChannelPage(name string, beforeID, limit int) (*model.Channel, error) 
 			}
 		}
 	}
+	_ = pageSize
 	return result, nil
 }
