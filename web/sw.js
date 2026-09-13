@@ -1,9 +1,10 @@
-const CACHE_NAME = "openfeed-shell-v3";
+const CACHE_NAME = "openfeed-shell-v4";
 const SHELL_FILES = [
   "/",
   "/index.html",
   "/style.css",
   "/app.js",
+  "/feed-enhancements.js",
   "/manifest.json",
 ];
 
@@ -26,12 +27,10 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
 
-  // Never cache API calls (channel data, status, downloads) — always live.
   if(url.pathname.startsWith("/api/")){
     return;
   }
 
-  // App-shell files: cache-first so the PWA still opens offline.
   e.respondWith(
     caches.match(e.request).then(cached => {
       if(cached) return cached;
