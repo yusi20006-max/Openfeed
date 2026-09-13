@@ -133,11 +133,32 @@ scripts/               ابزارهای bootstrap نصب و build
 
 این پروژه شخصی است؛ فایل مجوز به‌دلخواه بعداً اضافه می‌شود.
 
+## وضعیت پروژه — FINAL / COMPLETE
 
+OpenFeed در وضعیت **FINAL / COMPLETE** قرار دارد و کارهای برنامه‌ریزی‌شده‌ی فعلی آن تکمیل شده‌اند.
 
----
+کارهای تکمیل‌شده شامل:
 
-# Stable Core Policy
+- Termux readiness و bootstrap واقعی
+- provider contract و mobile freeze
+- رفع مشکلات نمایش تصویر و مسیر proxy/media
+- newest-first ordering و pagination / load-more
+- mobile viewport-level drawer
+- بهبود DNS resolution در مسیر TeleMirror / Telegram CDN
+- بهبود cache/PWA shell refresh
+- ثبت و نهایی‌سازی مسیرهای عملیاتی مرتبط
+
+از این نقطه، OpenFeed به‌عنوان **Stable Core** نگهداری می‌شود. کار جدید روی آن فقط در یکی از این حالت‌ها انجام می‌شود:
+
+- گسترش و قابلیت جدیدِ مشخص
+- رفع bug واقعی
+- security fix
+- performance improvement
+- compatibility update ضروری
+
+هیچ توسعه‌ی جانبی یا تغییر رفتاری صرفاً برای refactor، سلیقه یا speculative improvement انجام نمی‌شود.
+
+## Stable Core Policy
 
 OpenFeed is considered the Stable Core of the Yasin ecosystem.
 
@@ -158,6 +179,7 @@ OpenFeed will receive only:
 - Security updates
 - Performance improvements
 - Compatibility updates
+- Deliberate feature expansion
 
 The Termux work in this release is strictly a compatibility and
 installation improvement. It must not change Stable Core runtime behavior,
